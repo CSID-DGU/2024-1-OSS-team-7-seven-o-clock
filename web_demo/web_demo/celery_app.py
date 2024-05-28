@@ -9,6 +9,10 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web_demo.settings')
 
 app = Celery('web_demo')
 
+app.conf.update(
+    CELERY_BROKER_URL='redis://localhost:6379/0',
+)
+
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.
 # - namespace='CELERY' means all celery-related configuration keys
