@@ -6,6 +6,7 @@ import subprocess
 
 
 def main():
+    # sys.path.append('/root/amd/web_demo/myapp')
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web_demo.settings')
     try:

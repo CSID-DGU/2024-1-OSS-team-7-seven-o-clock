@@ -17,12 +17,12 @@ else
 fi
 
 # Check if Celery worker is already running
-if pgrep -f "python3 manage.py runserver 8080" > /dev/null
+if pgrep -f "celery -A web_demo worker --uid=celeryuser" > /dev/null
 then
-    echo "django server already started"
+    echo "Celery worker is already running"
 else
-    echo "Starting django server 8080 ..."
-    python3 manage.py runserver 8080 &
+    echo "Starting Celery worker..."
+    celery -A web_demo worker --loglevel=info &
     if [ $? -ne 0 ]; then
         echo "Failed to start Celery worker"
         exit 1
@@ -30,14 +30,13 @@ else
 fi
 
 
-
 # Check if Celery worker is already running
-if pgrep -f "celery -A web_demo worker --uid=celeryuser" > /dev/null
+if pgrep -f "python3 manage.py runserver 8080" > /dev/null
 then
-    echo "Celery worker is already running"
+    echo "django server already started"
 else
-    echo "Starting Celery worker..."
-    celery -A web_demo worker --loglevel=info &
+    echo "Starting django server 8080 ..."
+    python3 manage.py runserver 8080 &
     if [ $? -ne 0 ]; then
         echo "Failed to start Celery worker"
         exit 1

@@ -17,7 +17,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('main/', views.main_view, name='main'),
+    path('get_result/<str:task_id>/', views.get_result, name='get_result'),
 ]
