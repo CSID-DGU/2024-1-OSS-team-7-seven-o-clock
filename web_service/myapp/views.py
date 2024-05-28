@@ -1,7 +1,8 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.shortcuts import render
-from .tasks import add
+from myapp.tasks import add
+import os
 
 def main_view(request):
     # 비동기적으로 Celery 태스크를 실행

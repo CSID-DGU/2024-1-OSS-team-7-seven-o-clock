@@ -1,0 +1,28 @@
+<!-- /root/amd/web_service/myapp/templates/main.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Celery Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function() {
+            const taskId = "{{ task_id }}";
+            function checkTaskStatus() {
+                $.get(`/get_result/${taskId}/`, function(data) {
+                    if (data.status === 'SUCCESS') {
+                        $('#result').text('Result: ' + data.result);
+                    } else {
+                        setTimeout(checkTaskStatus, 1000);
+                    }
+                });
+            }
+            checkTaskStatus();
+        });
+    </script>
+</head>
+<body>
+    <h1>Celery Test</h1>
+    <div id="result">Calculating...</div>
+</body>
+</html>

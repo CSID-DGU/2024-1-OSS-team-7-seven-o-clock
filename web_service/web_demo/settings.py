@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 from .celery_app import app
 
 
@@ -56,7 +57,7 @@ ROOT_URLCONF = 'web_demo.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'myapp', 'templates'),],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
