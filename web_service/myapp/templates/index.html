@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person re-id</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Person re-id</h1>
+        <div class="menu">
+            <button id="reidentify-btn">재식별 하기</button>
+            <button id="create-dataset-btn">데이터셋 만들기</button>
+        </div>
+
+        <div id="reidentify-section" class="section hidden">
+            <div class="left">
+                <label for="dataset-select">데이터셋 선택:</label>
+                <select id="dataset-select">
+                    <option value="dataset1">Dataset 1</option>
+                    <option value="dataset2">Dataset 2</option>
+                </select>
+            </div>
+            <div class="right">
+                <label for="query-upload">쿼리 업로드 (.jpg):</label>
+                <div id="drop-zone" class="drop-zone">
+                    <p>드래그 앤 드롭 또는 클릭하여 파일 업로드</p>
+                    <input type="file" id="query-upload" accept=".jpg" hidden>
+                </div>
+                <img id="query-image" src="#" alt="Query Image" class="hidden">
+            </div>
+            <button id="start-reid-btn">Start re-id</button>
+            <div id="progress-bar-reid" class="progress hidden">
+                <div class="progress-bar"></div>
+            </div>
+            <div id="result-reid" class="results hidden"></div>
+        </div>
+
+        <div id="create-dataset-section" class="section hidden">
+            <label for="dataset-upload">압축파일 혹은 동영상 업로드 (.zip 혹은 .mp4):</label>
+            <div id="dataset-drop-zone" class="drop-zone">
+                <p>드래그 앤 드롭 또는 클릭하여 파일 업로드</p>
+                <input type="file" id="dataset-upload" accept=".zip, .mp4" hidden>
+            </div>
+            <div id="file-name" class="file-name hidden"></div>
+            <input type="text" id="dataset-name" placeholder="데이터셋의 이름을 입력해주세요">
+            <button id="create-dataset-btn-2">생성</button>
+            <div id="progress-bar-dataset" class="progress hidden">
+                <div class="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
