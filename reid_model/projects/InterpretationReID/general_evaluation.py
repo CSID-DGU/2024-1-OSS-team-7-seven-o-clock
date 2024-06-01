@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 import pickle, csv
-
+import pandas as pd
 
 sys.path.append('.')
 os.chdir("/root/amd/reid_model") #/home/workspace/로 이동하는것 방지 
@@ -130,7 +130,6 @@ def regist_dataset(dataset_path):
     for filename in os.listdir(dataset_path):
         if filename.endswith('.jpg'):
             img_paths.append(filename)
-    
     for img_path in img_paths:
         dataset.append((dataset_path + "/" + img_path, pid, camid, p_attr))
     return dataset
@@ -168,7 +167,9 @@ def filter_gallery_using_attr(query_pkl_path, gallery_pkl_path, dataset_path):
 
 
 
-def get_feat_dist_query_gallery(args, query_pkl_path, gallery_pkl_path, save_path):
+def get_feat_dist_query_gallery(args, dataset_path, query_pkl_path, gallery_pkl_path, save_path):
+    query_features_attr = load_data_from_pkl(query_pkl_path)
+    gallery_features_attr = load_data_from_pkl(gallery_pkl_path)
     args = default_argument_parser().parse_args()
     cfg = setup(args)
     cfg.defrost()
@@ -176,16 +177,24 @@ def get_feat_dist_query_gallery(args, query_pkl_path, gallery_pkl_path, save_pat
     model = Trainer.build_model(cfg, dataset_path)
     evaluator = Trainer.build_evaluator(cfg, num_query= 0)
 
-    query_features_attr = load_data_from_pkl(query_pkl_path)
-    gallery_features_attr = load_data_from_pkl(gallery_pkl_path)
-    
+    # 각 쿼리와 갤러리 이미지의 이름
+    query_keys = list(query_features_attr.keys())
+    gallery_keys = list(gallery_features_attr.keys())
 
     query_features = [value[0] for value in query_features_attr.values()]
     gallery_features = [value[0] for value in gallery_features_attr.values()]
+    # print(query_features)
+    query_features = torch.stack(query_features)
+    gallery_features = torch.stack(gallery_features)
 
     # dist: query_feat의 i번째 벡터와 gallery_feat의 j번째 벡터의 거리 값
     dist = evaluator.cal_dist(cfg.TEST.METRIC, query_features, gallery_features)
-    print()
+    
+    dist_df = pd.DataFrame(dist, index=query_keys, columns=gallery_keys)
+
+    # save_data_as_pkl(dist, save_path)
+    dist_df.to_pickle(save_path)
+    # dist_df.to_csv("/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/meta/query_gallery_feature_distance/query_gallery_feature_distance_10.csv")
 
 
     # 모델에 사진 하나 넣고 벡터, 속성 평가 값만 받아오도록 만들고
@@ -193,14 +202,75 @@ def get_feat_dist_query_gallery(args, query_pkl_path, gallery_pkl_path, save_pat
     # 샐러리 task에서는 데이터베이스 조회해서 갤러리에 있는 애들과 dist 측정하고 
     # 그 중 가장 유사한 10개 뱉어줌.
 
+def get_result_using_dist_filtered_gallery(gallery_path, dist_path):
+    result = ""
+    query_per_gallery_dict = load_data_from_pkl(gallery_path)
+    # query_per_gallery_dict의 key와 value 리스트에 basename 적용
+    query_per_gallery_dict = {
+        os.path.basename(query_img_path).strip(): [os.path.basename(gallery_img_path).strip() for gallery_img_path in gallery_img_path_list]
+        for query_img_path, gallery_img_path_list in query_per_gallery_dict.items()
+    }
+    dist_df = pd.read_pickle(dist_path)
+    # 인덱스와 컬럼을 순수 파일 이름으로 변환
+    dist_df.index = dist_df.index.map(lambda x: os.path.basename(x).strip())
+    dist_df.columns = dist_df.columns.map(lambda x: os.path.basename(x).strip())
+
+    # query_img_name = query_img_name.strip()
+    # gallery_img_name_list = [img.strip() for img in gallery_img_name_list]
+
+    total_count = 0
+    rank1 = rank5 = rank10 = 0 
+    for query_img_name, gallery_img_name_list in query_per_gallery_dict.items():
+        total_count+=1
+                  
+        top10_list = dist_df.loc[query_img_name, gallery_img_name_list].sort_values().index.tolist()[0:11]
+        print(top10_list)
+        query_pid = query_img_name[:4]
+        try:
+            if query_pid == top10_list[0][:4]:
+                rank1 +=1
+        except:
+            continue
+        for i in range(5):
+            try:
+                if query_pid == top10_list[i][:4]:
+                    rank5 +=1
+            except:
+                continue
+        for i in range(10):
+            try:
+                if query_pid == top10_list[i][:4]:
+                    rank10 +=1
+            except:
+                continue
+    result = [rank1/total_count, rank5/total_count, rank10/total_count]
+    save_path = "/root/amd/reid_model/projects/InterpretationReID/filtering_result/result.txt"
+    with open(save_path, 'w') as file:
+                file.write(f"top1,1 resolution100 rank1: {rank1/total_count}, rank5: {rank5/total_count}, rank10: { rank10/total_count}")
+
+    return result
+
+
 if __name__ == "__main__":
     args = default_argument_parser().parse_args()
     print("Command Line Args:", args)
-    dataset_path = '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/bounding_box_test'
-    save_path = '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/meta/gallery_feature_attr.pkl'
-    regist_new_dataset(args, dataset_path=dataset_path, save_path=save_path)
-
+    
+    gallery_pkl_path = "/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/meta/gallery_feature_attr.pkl"
     for i in range(1, 11):
-        dataset_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/query/query_{i*10}"
-        save_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/query/meta/query_{i*10}_feature_attr.pkl"
-        regist_new_dataset(args, dataset_path=dataset_path, save_path=save_path)
+        query_pkl_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/query/meta/query_{i* 10}_feature_attr.pkl"
+        save_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/meta/query_gallery_feature_distance/query_gallery_feature_distance_{i*10}.pkl"
+        get_feat_dist_query_gallery(args, dataset_path= "", query_pkl_path=query_pkl_path, gallery_pkl_path=gallery_pkl_path, save_path=save_path)
+    
+
+    #dataset_path = '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/bounding_box_test'
+    #save_path = '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/meta/gallery_feature_attr.pkl'
+    #regist_new_dataset(args, dataset_path=dataset_path, save_path=save_path)
+
+    #for i in range(1, 11):
+        #dataset_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/query/query_{i*10}"
+        #save_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/query/meta/query_{i*10}_feature_attr.pkl"
+        #regist_new_dataset(args, dataset_path=dataset_path, save_path=save_path)
+    for i in range(10, 11):
+        gallery_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/top_up1_down1/filtered_gallery/meta/remain_gallery_path_list_per_query_img_{i*10}.pkl"
+        dist_path = f"/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/meta/query_gallery_feature_distance/query_gallery_feature_distance_{i*10}.pkl"
+        get_result_using_dist_filtered_gallery(gallery_path=gallery_path, dist_path=dist_path)

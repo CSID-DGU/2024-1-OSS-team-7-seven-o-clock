@@ -20,6 +20,7 @@ def load_data_from_pkl(filename):
         data = pickle.load(f)
     return data
 
+origin_label_list = ['backpack', 'bag', 'clothes', 'down', 'downblack', 'downblue', 'downbrown', 'downgray', 'downgreen', 'downpink', 'downpurple', 'downwhite', 'downyellow', 'gender', 'hair', 'handbag', 'hat', 'up', 'upblack', 'upblue', 'upgray', 'upgreen', 'uppurple', 'upred', 'upwhite', 'upyellow']
 up_color_dict={18:"black",19:"blue",20:"gray",21:"green",22:"purple",23:"red",24:"white",25:"yellow",0:"unknown"} #상의색 8개
 down_color_dict={4:"black",5:"blue",6:"brown",7:"gray",8:"green",9:"pink",10:"purple",11:"white",12:"yellow",0:"unknown"} #하의색 9개
 color_dict = {4:"black",5:"blue",6:"brown",7:"gray",8:"green",9:"pink",10:"purple",11:"white",12:"yellow", 18:"black",19:"blue",20:"gray",21:"green",22:"purple",23:"red",24:"white",25:"yellow",0:"unknown"}
@@ -33,9 +34,10 @@ def load_gallery_real_attribute():
         gallery_real_attribute = load_data_from_pkl(gallery_real_attr_pkl_path)
     # 없다면 새로 만든다.
     else:
-        gallery_real_attribute_df = pd.read_csv(gallery_real_attribute_path).set_index('img_name').T.to_dict('list')
+        gallery_real_attribute_dict = pd.read_csv(gallery_real_attribute_path).set_index('img_name').drop(columns='age')[origin_label_list].T.to_dict('list')
         gallery_real_attribute = {}
-        for img_name, value in gallery_real_attribute_df.items():
+        for img_name, value in gallery_real_attribute_dict.items():
+        
             try:
                 upper_true_idx = 18 + value[18:26].index(2)
             except:
@@ -69,7 +71,9 @@ def get_topk_colors(attr, start_idx, end_idx, k):
 
 def get_over_n_colors(attr, start_idx, end_idx, threshold):
     indices = torch.nonzero(attr[start_idx:end_idx] > threshold).flatten()
-    return {color_dict[start_idx + idx.item()] for idx in indices}
+    result = {color_dict[start_idx + idx.item()] for idx in indices}
+    # 만약 0.5 이상인 속성 값이 하나도 없다면 그냥 가장 높은 값을 가진 것 하나 리턴.
+    return result if len(result) != 0 else get_topk_colors(attr, start_idx, end_idx, 1)
 
 def generate_filtered_gallery(iter_num, FILTERING_METHOD="top", TOP_UP_K=1, TOP_DOWN_K=1, THRESHOLD=0.5, resolution = 100):
     gallery_real_attribute, gallery_fake_features_attr = filtering_preprocess()
@@ -118,6 +122,7 @@ def generate_filtered_gallery(iter_num, FILTERING_METHOD="top", TOP_UP_K=1, TOP_
     remain_gallery_path_list_per_query_img = {}
 
     known_gallery_fake_attr_dict = {}
+    query_fake_up_set = query_fake_down_set = gallery_fake_up_set = gallery_fake_down_set = gallery_real_up_set = gallery_real_down_set = {}
     i = 0
     for query_img_path in query_img_path_list:
         tp = tn = fp = fn = 0
@@ -133,6 +138,8 @@ def generate_filtered_gallery(iter_num, FILTERING_METHOD="top", TOP_UP_K=1, TOP_
 
         start_time = time.time()
         i += 1
+        flag = "tn"
+        
         for gallery_img_path in gallery_img_path_list:
             if gallery_img_path not in known_gallery_fake_attr_dict:
                 if FILTERING_METHOD == "top":
@@ -151,25 +158,34 @@ def generate_filtered_gallery(iter_num, FILTERING_METHOD="top", TOP_UP_K=1, TOP_
             gallery_real_down_idx = gallery_real_attribute[gallery_img_path][1]
 
             if gallery_real_up_idx == 0:
-                gallery_real_up_list = gallery_fake_up_set
+                gallery_real_up_set = gallery_fake_up_set
             else:
-                gallery_real_up_list = {up_color_dict[gallery_real_up_idx]}
+                gallery_real_up_set = {up_color_dict[gallery_real_up_idx]}
             if gallery_real_down_idx == 0:
-                gallery_real_down_list = gallery_fake_down_set
+                gallery_real_down_set = gallery_fake_down_set
             else:
-                gallery_real_down_list = {down_color_dict[gallery_real_down_idx]}
-
+                gallery_real_down_set = {down_color_dict[gallery_real_down_idx]}
+            
+            # 모델 예측 쿼리, 갤러리 상하의 색상이 둘다 동일하면 갤러리에 등록
             if (query_fake_up_set & gallery_fake_up_set) and (query_fake_down_set & gallery_fake_down_set):
                 remain_filtered_gallery_features_dict[gallery_img_path] = gallery_fake_features_attr[gallery_img_path]
                 remain_gallery_path_list_per_query_img[query_img_path].append(gallery_img_path)
-                if (query_fake_up_set & gallery_real_up_list) and (query_fake_down_set & gallery_real_down_list):
+                # 쿼리 속성이 갤러리와 같으면 필터링하면 안되는데 안했음. -> true negative
+                if (query_fake_up_set & gallery_real_up_set) and (query_fake_down_set & gallery_real_down_set):
+                    flag = "tn"
                     tn += 1
+                # 쿼리 속성이 갤러리와 다르니까 필터링해야 하는 것을 안함.
                 else:
+                    flag = "fp"
                     fp += 1
             else:
-                if (query_fake_up_set & gallery_real_up_list) and (query_fake_down_set & gallery_real_down_list):
+                # 쿼리 속성이 갤러리와 같으면 필터링하면 안 되는 것을 한 것.
+                if (query_fake_up_set & gallery_real_up_set) and (query_fake_down_set & gallery_real_down_set):
+                    flag = "fn"
                     fn += 1
+                # 필터링해야하는 것을 함.
                 else:
+                    flag = "tp"
                     tp += 1
 
         precision = tp / (tp + fp) if (tp + fp) != 0 else 0
@@ -177,9 +193,13 @@ def generate_filtered_gallery(iter_num, FILTERING_METHOD="top", TOP_UP_K=1, TOP_
         F1_score = 2 * precision * recall / (precision + recall) if (precision + recall) != 0 else 0
 
         end_time = time.time()
-        if i % 100 == 0 or i == 3368:
-            print(f'resolution_{(iter_num+1)*10}_{os.path.basename(query_img_path)} 쿼리 결과 -','F1-score:', F1_score, f'fake_up:{query_fake_up_set}, fake_down:{query_fake_down_set}, time: {round(end_time-start_time,2)}초. {i}/3368')
-
+        if i % 100 == 0 or i == 3368 or i == 1:
+            print(f'resolution_{(iter_num+1)*10}, query_img_path: {os.path.basename(query_img_path)} 쿼리 결과 -','F1-score:', F1_score, f'fake_up:{query_fake_up_set}, fake_down:{query_fake_down_set}, time: {round(end_time-start_time,2)}초. {i}/3368')
+            print(f"query_fake_up: {query_fake_up_set}, query_fake_down: {query_fake_down_set}")
+            print(f"gallery_img_path: {gallery_img_path}")
+            print(f"gallery_fake_up: {gallery_fake_up_set}, gallery_fake_down: {gallery_fake_down_set}")
+            print(f"gallery_real_up: {gallery_real_up_set}, gallery_real_down: {gallery_real_down_set}")
+            print(f"result: {flag}")
         TP_list.append(tp)
         FP_list.append(fp)
         TN_list.append(tn)
@@ -213,13 +233,17 @@ async def main(args):
         futures = []
         for i in range(10):
             resolution = (i + 1) * 10
+            print(f"start processing. \nresolution: {resolution}, filtering method: {FILTERING_METHOD}, top_up: {TOP_UP_K}, top_down: {TOP_DOWN_K}, threshold: {THRESHOLD}")
             futures.append(
                 loop.run_in_executor(executor, generate_filtered_gallery, i, FILTERING_METHOD, TOP_UP_K, TOP_DOWN_K, THRESHOLD, resolution)
             )
+
         
-        results = await asyncio.gather(*futures)
+        # results = await asyncio.gather(*futures)
         
-        for i, result in enumerate(results):
+        for future in asyncio.as_completed(futures):
+            result = await future
+            time.sleep(60)
             TP_list, FP_list, TN_list, FN_list, F1_list, remain_filtered_gallery_features_dict, remain_gallery_path_list_per_query_img, resolution = result
 
             remain_gallery_path_list_per_query_img_save_path, filtered_gallery_save_path, f1_score_save_path = get_file_paths(
@@ -240,7 +264,7 @@ async def main(args):
                 destination_file = os.path.join(filtered_gallery_save_path, img_name)
                 # ensure_directory_exists(destination_file)
                 shutil.copyfile(img_path, destination_file)
-
+            print("copy gallery")
             output_str = f"TP: {sum(TP_list)/len(TP_list)}\n"
             output_str += f"True Positive (TP): {sum(TP_list)/len(TP_list)}\n"
             output_str += f"False Positive (FP): {sum(FP_list)/len(FP_list)}\n"
@@ -249,17 +273,24 @@ async def main(args):
             output_str += f"F1-score: {sum(F1_list)/len(F1_list)}\n"
             with open(f1_score_save_path, 'w') as file:
                 file.write(output_str)
+            print("save f1-score")
 
 if __name__ == '__main__':
-    MAX_WORKER = 3  # 프로세스 수를 4로 제한
+    MAX_WORKER = 2  # 프로세스 수를 4로 제한
     FILTERING_METHOD = "top"
     TOP_UP_K = 1
     TOP_DOWN_K = 1
     THRESHOLD = 0.5
-    args = (MAX_WORKER, FILTERING_METHOD, TOP_UP_K, TOP_DOWN_K, THRESHOLD)
-    asyncio.run(main(args))
-    print("sleep 5sec . . .")
-    time.sleep(5)
+    '''
+    for i in range(3, 4):
+        for j in range(3, 4):
+            TOP_UP_K = i
+            TOP_DOWN_K = j
+            args = (MAX_WORKER, FILTERING_METHOD, TOP_UP_K, TOP_DOWN_K, THRESHOLD)
+            asyncio.run(main(args))
+            print("sleep 10 sec . . .")
+            time.sleep(10)
+    '''
     FILTERING_METHOD = "over05"
     THRESHOLD = 0.5
     args = (MAX_WORKER, FILTERING_METHOD, TOP_UP_K, TOP_DOWN_K, THRESHOLD)

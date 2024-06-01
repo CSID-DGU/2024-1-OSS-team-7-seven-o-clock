@@ -206,7 +206,6 @@ if __name__ == '__main__':
     train_data_set = set(file_lists['train'])
     test_data_set = set(file_lists['test'])
     query_data_set = set(file_lists['query'])
-
     df['dataset_category'] = df['origin_img_name'].apply(lambda img_name: categorize_img_name(img_name, train_data_set, test_data_set, query_data_set))
     save_to_csv(df, csv_result_dir_path + "/correct_label_intermid.csv")
 
