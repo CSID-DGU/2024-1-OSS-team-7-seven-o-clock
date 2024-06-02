@@ -8,7 +8,7 @@ DATALOADER:
 DATASETS:
   COMBINEALL: false
   NAMES:
-  - Market1501_Interpretationa
+  - Market1501_Interpretation
   TESTS:
   - Market1501_Interpretation
 INPUT:

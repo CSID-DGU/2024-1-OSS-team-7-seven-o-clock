@@ -55,6 +55,7 @@ def default_argument_parser():
     parser.add_argument(
         "--machine-rank", type=int, default=0, help="the rank of this machine (unique per machine)"
     )
+    parser.add_argument("--output-dir", type=str, default="/root/amd/reid_model/logs/market1501/circle_R50_ip")
 
     # PyTorch still may leave orphan processes in multi-gpu training.
     # Therefore we use a deterministic way to obtain port,
