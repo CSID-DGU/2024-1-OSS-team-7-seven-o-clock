@@ -3,5 +3,4 @@ from django.core.files.uploadedfile import TemporaryUploadedFile as BaseTemporar
 
 class TemporaryUploadedFile(BaseTemporaryUploadedFile):
     def close(self) -> None:
-        print('close')
         return
