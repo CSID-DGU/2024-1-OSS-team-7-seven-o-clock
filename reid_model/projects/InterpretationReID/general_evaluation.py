@@ -10,6 +10,8 @@ import os
 import sys
 import pickle, csv
 import pandas as pd
+import redis, json
+from datetime import datetime
 
 sys.path.append('.')
 os.chdir("/root/amd/reid_model") #/home/workspace/로 이동하는것 방지 
@@ -22,6 +24,8 @@ import projects.InterpretationReID.interpretationreid as PII
 from fastreid.modeling.meta_arch import build_model
 import torch
 from fastreid.utils.logger import setup_logger
+
+redis_client = None
 
 class Trainer(DefaultTrainer):
     def __init__(cls, cfg, dataset_path):
@@ -106,6 +110,64 @@ class Trainer(DefaultTrainer):
                     torch.cuda.synchronize()
         
         return data_dict
+    
+    # celery를 사용하는 버전
+    @classmethod
+    def test_celery(cls, cfg, model, task_id, evaluators=None):
+        redis_client = create_redis_client()
+        task_key = f'celery-task-meta-{task_id}'
+
+        try:
+            task_data = redis_client.get(task_key)
+        except:
+            print("레디스에서 해당 task 가져오기 실패")
+            exit()
+        try:
+            task_data = json.loads(task_data)
+        except:
+            print("task data json 파싱 실패")
+            exit()
+        img_dataset = regist_dataset(cls.dataset_path)
+        data_loader, num_query , name_of_attribute = cls.build_test_loader(cfg, img_dataset)
+        evaluator = cls.build_evaluator(cfg, num_query=num_query)
+        # model을 평가 모드로 전환
+        model.eval()
+
+        data_dict = {}
+
+        total = len(data_loader) 
+        update_interval = total // 50
+        progress = 50
+        i = 0
+        with torch.no_grad():
+            for idx, inputs in enumerate(data_loader):
+                i += 1
+                if i % update_interval == 0:
+                    # celery task status update 코드
+                    progress += 1
+                    task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+                    task_data['meta']['progress'] = progress
+                    redis_client.set(task_key, json.dumps(task_data))
+
+                outputs_dict = model(inputs)
+                # feature 
+                outputs = outputs_dict["outputs"]
+                attrs = outputs_dict['att_heads']['cls_outputs'].clone().detach()
+                # 아래는 0.5가 넘는 경우 1로 판단하도록 만들고 append 하는 코드
+                # att_prec = torch.where(attrs>0.5,torch.ones_like(attrs),torch.zeros_like(attrs)).cpu()
+                
+                #result.append((inputs["img_paths"], outputs.cpu(), att_prec.cpu()))
+                img_paths = inputs["img_paths"]
+                len_img_paths = len(img_paths)
+
+                for i in range(len_img_paths):
+                    # data_dict[img_paths[i]] = [outputs.cpu()[i], att_prec.cpu()[i]]
+                    data_dict[img_paths[i]] = [outputs.cpu()[i], attrs.cpu()[i]]
+
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+        
+        return data_dict
         
 
             
@@ -117,7 +179,20 @@ def load_data_from_pkl(filename):
         data = pickle.load(f)
     return data
 
-
+# redis client를 싱글톤으로 관리
+def create_redis_client():
+    global redis_client
+    if redis_client is None:
+        try:
+            redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+            # 연결 테스트
+            redis_client.ping()
+            print("Redis 클라이언트 연결 성공")
+        except Exception as e:
+            print("Redis 클라이언트 시작 실패:", e)
+            redis_client = None
+            exit()
+    return redis_client
 
 def regist_dataset(dataset_path):
     pid = 0
@@ -161,6 +236,24 @@ def regist_new_dataset(args, dataset_path, save_path):
     save_data_as_pkl(res, save_path)
     return res
 
+# celery를 사용하는 버전 
+def regist_new_dataset(args, dataset_path, save_path, task_id):
+    args = default_argument_parser().parse_args()
+    cfg = setup(args)
+
+    cfg.defrost()
+    cfg.MODEL.BACKBONE.PRETRAIN = False
+    model = Trainer.build_model(cfg, dataset_path)
+
+    Checkpointer(model).load(cfg.MODEL.WEIGHTS)  # load trained model
+    if task_id != None:
+        res = Trainer.test_celery(cfg, model, task_id=task_id)
+    else:
+        res = Trainer.test(cfg, model)
+    if save_path != None:
+        save_data_as_pkl(res, save_path)
+    return res
+
 def filter_gallery_using_attr(query_pkl_path, gallery_pkl_path, dataset_path):
     print()
     
@@ -195,12 +288,6 @@ def get_feat_dist_query_gallery(args, dataset_path, query_pkl_path, gallery_pkl_
     # save_data_as_pkl(dist, save_path)
     dist_df.to_pickle(save_path)
     # dist_df.to_csv("/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/filtering/meta/query_gallery_feature_distance/query_gallery_feature_distance_10.csv")
-
-
-    # 모델에 사진 하나 넣고 벡터, 속성 평가 값만 받아오도록 만들고
-    # 그걸 리턴해줌. (샐러리 task로)
-    # 샐러리 task에서는 데이터베이스 조회해서 갤러리에 있는 애들과 dist 측정하고 
-    # 그 중 가장 유사한 10개 뱉어줌.
 
 def get_result_using_dist_filtered_gallery(gallery_path, dist_path, result_output_path):
     result = ""

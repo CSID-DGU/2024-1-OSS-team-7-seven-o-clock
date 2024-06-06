@@ -8,7 +8,7 @@ import os
 import torch
 import shutil
 from concurrent.futures import ProcessPoolExecutor
-import asyncio
+import asyncio, redis, json, datetime
 
 
 def save_data_as_pkl(data, filename):
@@ -24,6 +24,22 @@ origin_label_list = ['backpack', 'bag', 'clothes', 'down', 'downblack', 'downblu
 up_color_dict={18:"black",19:"blue",20:"gray",21:"green",22:"purple",23:"red",24:"white",25:"yellow",0:"unknown"} #상의색 8개
 down_color_dict={4:"black",5:"blue",6:"brown",7:"gray",8:"green",9:"pink",10:"purple",11:"white",12:"yellow",0:"unknown"} #하의색 9개
 color_dict = {4:"black",5:"blue",6:"brown",7:"gray",8:"green",9:"pink",10:"purple",11:"white",12:"yellow", 18:"black",19:"blue",20:"gray",21:"green",22:"purple",23:"red",24:"white",25:"yellow",0:"unknown"}
+
+# redis client를 싱글톤으로 관리
+def create_redis_client():
+    global redis_client
+    if redis_client is None:
+        try:
+            redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+            # 연결 테스트
+            redis_client.ping()
+            print("Redis 클라이언트 연결 성공")
+        except Exception as e:
+            print("Redis 클라이언트 시작 실패:", e)
+            redis_client = None
+            exit()
+    return redis_client
+
 
 def load_gallery_real_attribute():
     gallery_real_attribute_path = '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/test_attribute.csv'
@@ -207,6 +223,121 @@ def generate_filtered_gallery(iter_num, FILTERING_METHOD="top", TOP_UP_K=1, TOP_
         F1_list.append(F1_score)
 
     return TP_list, FP_list, TN_list, FN_list, F1_list, remain_filtered_gallery_features_dict, remain_gallery_path_list_per_query_img, resolution
+
+def get_reid_result_top10(query_features_attr, gallery_features_attr, FILTERING_METHOD="top", TOP_UP_K=3, TOP_DOWN_K=3, THRESHOLD=0.5, task_id = None):
+    redis_client = create_redis_client()
+    task_key = f'celery-task-meta-{task_id}'
+
+    try:
+        task_data = redis_client.get(task_key)
+    except:
+        print("레디스에서 해당 task 가져오기 실패")
+        exit()
+    try:
+        task_data = json.loads(task_data)
+    except:
+        print("task data json 파싱 실패")
+        exit()
+
+    # key: img_path + img_name, value: feature (tensor 2048)
+    query_features = {}
+    # key: img_path + img_name, value: attr (tensor 26)
+    gallery_features = {}
+
+    # key: img_path + img_name, value: feature
+    query_attr = {}
+    # key: img_path + img_name, value: attr (tensor 26)
+    gallery_attr = {}
+
+    # img_path + img_name
+    query_img_path_list = query_features_attr.keys()
+    gallery_img_path_list = gallery_features_attr.keys()
+
+    total = len(gallery_img_path_list) 
+    update_interval = total // 50
+    progress = 0
+
+
+    # cuda 사용이 불가능하면 메인 메모리에 올리기
+    if torch.cuda.is_available():
+        for key, value in query_features_attr.items():
+            query_attr[key] = value[1].cuda()
+        for key, value in gallery_features_attr.items():
+            gallery_attr[key] = value[1].cuda()
+    else:
+        for key, value in query_features_attr.items():
+            query_attr[key] = value[1]
+        for key, value in gallery_features_attr.items():
+            gallery_attr[key] = value[1]
+
+
+    query_fake_up_set = query_fake_down_set = gallery_fake_up_set = gallery_fake_down_set = {}
+    
+    filtered_gallery_features_dict = {}
+    for query_img_path in query_img_path_list:
+        if FILTERING_METHOD == "top":
+            query_fake_up_set = get_topk_colors(query_attr[query_img_path], 18, 26, TOP_UP_K)
+            query_fake_down_set = get_topk_colors(query_attr[query_img_path], 4, 13, TOP_DOWN_K)
+        elif FILTERING_METHOD == "over05":
+            query_fake_up_set = get_over_n_colors(query_attr[query_img_path], 18, 26, THRESHOLD)
+            query_fake_down_set = get_over_n_colors(query_attr[query_img_path], 4, 13, THRESHOLD)
+
+        i = 0
+        
+        for gallery_img_path in gallery_img_path_list:
+            if FILTERING_METHOD == "top":
+                gallery_fake_up_set = get_topk_colors(gallery_attr[gallery_img_path], 18, 26, TOP_UP_K)
+                gallery_fake_down_set = get_topk_colors(gallery_attr[gallery_img_path], 4, 13, TOP_DOWN_K)
+            elif FILTERING_METHOD == "over05":
+                gallery_fake_up_set = get_over_n_colors(gallery_attr[gallery_img_path], 18, 26, THRESHOLD)
+                gallery_fake_down_set = get_over_n_colors(gallery_attr[gallery_img_path], 4, 13, THRESHOLD)
+
+
+            # 모델 예측 쿼리, 갤러리 상하의 색상이 둘다 동일하면 갤러리에 등록
+            if (query_fake_up_set & gallery_fake_up_set) and (query_fake_down_set & gallery_fake_down_set):
+                filtered_gallery_features_dict[gallery_img_path] = gallery_features_attr[gallery_img_path][0]
+            i += 1
+            if i % update_interval == 0:
+                # celery task status update 코드
+                progress += 1
+                task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+                task_data['meta']['progress'] = progress
+                redis_client.set(task_key, json.dumps(task_data))
+    
+
+    total = len(filtered_gallery_features_dict) 
+    update_interval = total // 50
+    progress = 50
+    # query 는 하나의 이미지임.
+    query_img_path = query_img_path[0] 
+    # Query 벡터를 numpy 배열로 변환
+    query_vector = np.array(query_features_attr['query_img_path'])
+
+
+    i = 0
+    # 각 갤러리 벡터와 Query 벡터 간의 유클리드 거리 계산 및 저장
+    distances = {}
+    for path, features in filtered_gallery_features_dict.items():
+        gallery_vector = np.array(features)
+        # 유클리드 거리 계산
+        distance = np.linalg.norm(query_vector, gallery_vector)
+        distances[path] = distance
+        i += 1
+        if i % update_interval == 0:
+            # celery task status update 코드
+            progress += 1
+            task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+            task_data['meta']['progress'] = progress
+            redis_client.set(task_key, json.dumps(task_data))
+
+    # 거리 기준으로 정렬된 딕셔너리 생성
+    sorted_distances = dict(sorted(distances.items(), key=lambda item: item[1]))
+
+    # 상위 10개의 이미지 경로 반환
+    result_img_path_list = list(sorted_distances.keys())
+    result_img_path_list = result_img_path_list[:10] if len(result_img_path_list) > 9 else result_img_path_list
+
+    return result_img_path_list
 
 def ensure_directory_exists(file_path):
     directory = os.path.dirname(file_path)
