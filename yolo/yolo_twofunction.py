@@ -6,8 +6,8 @@
 
 #여기는 만약 필요하다면!!
 """
-!pip install ultralytics
-!pip install onnxruntime-gpu
+!pip install ultralytics #이거는 혹시 임포트 안된다면
+!pip install onnxruntime-gpu #이것도
 
 from ultralytics import YOLO
 import zipfile
@@ -35,26 +35,7 @@ onnx_model = YOLO('yolov8n.onnx')
                     # frmae_count / len(image_paths)로 구
 
 
-# In[1]:
-
-
-from ultralytics import YOLO
-import zipfile
-import cv2
-import os
-from PIL import Image
-
-# Load the YOLOv8 model
-model = YOLO('yolov8n.pt')
-model.to('cuda')
-# Export the model to ONNX format
-model.export(format='onnx')  # creates 'yolov8n.onnx'
-
-# Load the exported ONNX model
-onnx_model = YOLO('yolov8n.onnx')
-
-
-# In[2]:
+# In[8]:
 
 
 def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str):
@@ -64,9 +45,8 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str):
     absolute_paths = []
     idx = 0
 
-    crop_dir_name = os.path.join(dataset_save_path, dataset_name) #저장폴더 만들기
-    if not os.path.exists(crop_dir_name):
-        os.makedirs(crop_dir_name) 
+    if not os.path.exists(dataset_save_path): #dataset_save_path 없으면 새로 만듭니다 원래는 여기에 dataset_name폴더를 또 만들었는데
+        os.makedirs(dataset_save_path) #그 대신 그냥 save_paht에 그대로 추가하게 바꾼거에요
 
     frame_count = 0 
     while cap.isOpened():#이미지 한장한장 뽑아오면서 돌리기
@@ -81,7 +61,7 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str):
             for box in boxes: #잘라서 저장
                 idx += 1
                 crop_obj = im0[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
-                image_path = os.path.join(crop_dir_name, f"{dataset_name}_{idx}.png")
+                image_path = os.path.join(dataset_save_path, f"{dataset_name}_{idx}.png") #save_path에 그대로 저장하게 위치 지정합니다.
                 cv2.imwrite(image_path, crop_obj)
                 absolute_path = os.path.abspath(image_path)
                 absolute_paths.append(absolute_path)
@@ -94,9 +74,8 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str):
 def yolo_zip(dataset_name: str, zip_file_path: str, dataset_save_path: str):
     absolute_paths = []
 
-    crop_dir_name = os.path.join(dataset_save_path, dataset_name)
-    if not os.path.exists(crop_dir_name):
-        os.makedirs(crop_dir_name)
+    if not os.path.exists(dataset_save_path):
+        os.makedirs(dataset_save_path)
     
     if not os.path.exists('zip_extract'): #압축풀기
         os.makedirs('zip_extract')
@@ -120,8 +99,8 @@ def yolo_zip(dataset_name: str, zip_file_path: str, dataset_save_path: str):
             for idx, box in enumerate(results[0].boxes.xyxy.tolist()): #사진 저장
                 x1, y1, x2, y2 = box
                 img_cropped = im0.crop((x1,y1,x2,y2))
-                img_cropped.save(f"{dataset_save_path}/{dataset_name}/{dataset_name}_{idx}.png")
-                absolute_path = os.path.abspath(f"{dataset_save_path}/{dataset_name}/{dataset_name}_{idx}.png")
+                img_cropped.save(f"{dataset_save_path}/{dataset_name}_{idx}.png")#save_path에 그대로 저장하게 위치 지정합니다
+                absolute_path = os.path.abspath(f"{dataset_save_path}/{dataset_name}_{idx}.png")
                 absolute_paths.append(absolute_path)
         
         #frmae_count / len(image_paths) 이쯤에 넣으면 얼마나 완료했는지 구합니다
