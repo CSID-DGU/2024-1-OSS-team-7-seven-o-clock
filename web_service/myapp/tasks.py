@@ -11,6 +11,7 @@ from reid_model.projects.InterpretationReID.general_evaluation import regist_new
 from reid_model.projects.InterpretationReID.final_total_filtering_jy_multi_process import get_reid_result_top10
 
 sys.path.append('/root/amd/yolo')
+from yolo.yolo_twofunction import yolo_vid
 
 # 아래는 /root/amd/yolo/myYolo.py 에서 yolo_vid 메소드를 임포트 하는 방법
 # from yolo.myYolo import yolo_vid
@@ -65,7 +66,7 @@ def register_dataset(self, dataset_name: str, video_path: str) -> bool:
     
     # yolo를 이용하여 동영상에서 이미지를 추출하는 함수 추가
     try: 
-        # yolo_vid(task_id = task_id, dataset_name = dataset_name, video_path = video_path, dataset_save_path = dataset_save_path)
+        yolo_vid(dataset_name = dataset_name, video_path = video_path, dataset_save_path = dataset_save_path, task_id = task_id)
         pass
     except:
         print("영상으로 데이터셋을 만드는 과정에서 오류 발생")
