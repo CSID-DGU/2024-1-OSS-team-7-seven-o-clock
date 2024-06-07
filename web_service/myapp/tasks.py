@@ -45,7 +45,7 @@ def start_re_id_task(self, dataset_name: str, query_img_path: str) -> None:
     
     reid_result_img_path_list = get_reid_result_top10(query_features_attr=query_feat_attr_dict, gallery_features_attr=gallery_feat_attr_dict, task_id=self.request.id)
 
-
+    self.update_state(state='SUCCESS', result=reid_result_img_path_list, meta={'progress': 100, 'total': 100})
     return None
 
 @shared_task(bind=True)
@@ -90,6 +90,5 @@ def register_dataset(self, dataset_name: str, video_path: str) -> bool:
         print("데이터셋 등록 후 feat, attr 계산 중 오류 발생")
         exit()
 
-
-
+    self.update_state(state='SUCCESS', result=True, meta={'progress': 100, 'total': 100})
     return True
