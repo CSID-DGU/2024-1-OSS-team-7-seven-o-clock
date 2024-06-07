@@ -90,6 +90,53 @@ document.getElementById('dataset-upload').addEventListener('change', function (e
     handleFileUpload(file, 'dataset-upload');
 });
 
+async function checkTaskStatus(taskId) {
+    try {
+        const response = await fetch(`https://localhost:8080/get_state?task_id=${taskId}`, {
+            method: 'GET'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            updateProgress(result.current, result.total);
+
+            if (result.state === 'SUCCESS') {
+                displayResults(result.result);
+                clearInterval(taskStatusInterval); // Stop checking after success
+            } else if (result.state === 'FAILURE') {
+                alert('재식별 실패.');
+                clearInterval(taskStatusInterval); // Stop checking after failure
+            }
+        } else {
+            alert('상태 조회 실패.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function updateProgress(current, total) {
+    const progressBar = document.querySelector('#progress-bar-reid .progress-bar');
+    const percentage = (current / total) * 100;
+    progressBar.style.width = `${percentage}%`;
+}
+
+function displayResults(results) {
+    const resultsContainer = document.getElementById('result-reid');
+    resultsContainer.innerHTML = '';
+
+    results.forEach(result => {
+        const img = document.createElement('img');
+        img.src = `data:${result.content_type};base64,${result.data}`;
+        img.alt = result.name;
+        resultsContainer.appendChild(img);
+    });
+
+    resultsContainer.classList.remove('hidden');
+}
+
+let taskStatusInterval;
+
 document.getElementById('start-reid-btn').addEventListener('click', async function () {
     const datasetSelect = document.getElementById('dataset-select').value;
     const queryUpload = document.getElementById('query-upload').files[0];
@@ -106,7 +153,7 @@ document.getElementById('start-reid-btn').addEventListener('click', async functi
     formData.append('dataset_name', datasetSelect);
 
     try {
-        const response = await fetch('https:///localhost:8080/start_re_id', {
+        const response = await fetch('https://localhost:8080/start_re_id', {
             method: 'POST',
             body: formData
         });
@@ -115,7 +162,8 @@ document.getElementById('start-reid-btn').addEventListener('click', async functi
             const result = await response.json();
             const taskId = result.task_id;
             console.log('Task ID:', taskId);
-            // Handle the response (e.g., polling for results using task_id)
+
+            taskStatusInterval = setInterval(() => checkTaskStatus(taskId), 5000); // Check status every 5 seconds
         } else {
             alert('재식별 실패.');
         }
@@ -147,7 +195,7 @@ document.getElementById('create-dataset-btn-2').addEventListener('click', async 
     formData.append('dataset_name', datasetName);
 
     try {
-        const response = await fetch('https:///localhost:8080/regist_dataset', {
+        const response = await fetch('https://localhost:8080/regist_dataset', {
             method: 'POST',
             body: formData
         });
@@ -169,7 +217,7 @@ document.getElementById('create-dataset-btn-2').addEventListener('click', async 
 
 async function fetchDatasets() {
     try {
-        const response = await fetch('https:///localhost:8080/get-datasets', {
+        const response = await fetch('https://localhost:8080/get-datasets', {
             method: 'GET'
         });
 
@@ -193,7 +241,7 @@ async function fetchDatasets() {
 
 async function fetchMainPage() {
     try {
-        const response = await fetch('https:///localhost:8080/regist_page', {
+        const response = await fetch('https://localhost:8080/regist_page', {
             method: 'GET'
         });
 
