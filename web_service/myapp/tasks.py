@@ -1,3 +1,11 @@
+import multiprocessing
+
+# 'spawn' 시작 방법 설정
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass  # 이미 설정된 경우 무시
+
 import sys, os
 from celery import shared_task
 from PIL import Image
@@ -63,14 +71,7 @@ def register_dataset(self, dataset_name: str, video_path: str) -> bool:
         return False
     
     dataset_save_path = '/root/amd/reid_model/datasets/' + dataset_name + "/imgs"
-    
-    # yolo를 이용하여 동영상에서 이미지를 추출하는 함수 추가
-    try: 
-        yolo_vid(dataset_name = dataset_name, video_path = video_path, dataset_save_path = dataset_save_path, task_id = task_id)
-        pass
-    except:
-        print("영상으로 데이터셋을 만드는 과정에서 오류 발생")
-        exit()
+    yolo_vid(dataset_name = dataset_name, video_path = video_path, dataset_save_path = dataset_save_path, task_id = task_id)
 
     dataset_names_dict[dataset_name] = ''
 
@@ -79,16 +80,17 @@ def register_dataset(self, dataset_name: str, video_path: str) -> bool:
         json.dump(dataset_names_dict, f, ensure_ascii=False)
 
     # 임시 디렉토리에 저장된 파일을 삭제
-    os.remove(video_path)
+    try:
+        os.remove(video_path)
+    except:
+        print("동영상 임시 파일 삭제 실패")
 
     # 새로 입력받은 데이터셋의 사진의 feature, attribute를 저장하는 pkl 파일 만들기
     args = "--config-file /root/amd/reid_model/projects/InterpretationReID/configs/Market1501_Circle/circle_R50_ip_eval_only.yml --eval-only  MODEL.DEVICE \"cuda:0\" "
     feat_attr_pkl_save_path = '/root/amd/reid_model/datasets/' + dataset_name + '/meta/feature_attr.pkl'
-    try:
-        regist_new_dataset(args=args, dataset_path=dataset_save_path, save_path=feat_attr_pkl_save_path, task_id=task_id)
-    except:
-        print("데이터셋 등록 후 feat, attr 계산 중 오류 발생")
-        exit()
+    
+    regist_new_dataset(args=args, dataset_path=dataset_save_path, save_path=feat_attr_pkl_save_path, task_id=task_id)
+    
 
     self.update_state(state='SUCCESS', result=True, meta={'progress': 100, 'total': 100})
     return True

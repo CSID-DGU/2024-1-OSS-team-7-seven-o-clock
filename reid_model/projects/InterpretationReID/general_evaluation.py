@@ -12,6 +12,7 @@ import pickle, csv
 import pandas as pd
 import redis, json
 from datetime import datetime
+redis_client = None
 
 sys.path.append('.')
 os.chdir("/root/amd/reid_model") #/home/workspace/로 이동하는것 방지 
@@ -127,6 +128,9 @@ class Trainer(DefaultTrainer):
         except:
             print("task data json 파싱 실패")
             exit()
+        if 'meta' not in task_data:
+            print("task_data에 'meta' 키가 없습니다.")
+            task_data['meta'] = {}  # 'meta' 키가 없는 경우 새로 생성
         img_dataset = regist_dataset(cls.dataset_path)
         data_loader, num_query , name_of_attribute = cls.build_test_loader(cfg, img_dataset)
         evaluator = cls.build_evaluator(cfg, num_query=num_query)
@@ -145,7 +149,7 @@ class Trainer(DefaultTrainer):
                 if i % update_interval == 0:
                     # celery task status update 코드
                     progress += 1
-                    task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+                    task_data['date_done'] = datetime.now().isoformat()
                     task_data['meta']['progress'] = progress
                     redis_client.set(task_key, json.dumps(task_data))
 

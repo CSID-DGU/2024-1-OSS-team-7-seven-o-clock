@@ -37,13 +37,20 @@ onnx_model = YOLO('yolov8n.onnx')
 
 # In[1]:
 
+import multiprocessing
+
+# 'spawn' 시작 방법 설정
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass  # 이미 설정된 경우 무시
 
 from ultralytics import YOLO
 import zipfile
 import cv2
-import os, redis, json, datetime
+import os, redis, json
 from PIL import Image
-
+from datetime import datetime
 # Load the YOLOv8 model
 model = YOLO('yolov8n.pt')
 model.to('cuda')
@@ -53,8 +60,8 @@ model.export(format='onnx')  # creates 'yolov8n.onnx'
 # Load the exported ONNX model
 onnx_model = YOLO('yolov8n.onnx')
 
-
 # In[2]:
+redis_client = None
 
 # redis client를 싱글톤으로 관리
 def create_redis_client():
@@ -85,6 +92,9 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str, task_id
     except:
         print("task data json 파싱 실패")
         exit()
+    if 'meta' not in task_data:
+        print("task_data에 'meta' 키가 없습니다.")
+        task_data['meta'] = {}  # 'meta' 키가 없는 경우 새로 생성
 
     cap = cv2.VideoCapture(video_path)
     assert cap.isOpened(), "Error reading video file"
@@ -121,7 +131,7 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str, task_id
         if frame_count % update_interval == 0:
             # celery task status update 코드
             progress += 1
-            task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+            task_data['date_done'] = datetime.now().isoformat()
             task_data['meta']['progress'] = progress
             redis_client.set(task_key, json.dumps(task_data))
 
@@ -130,7 +140,7 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str, task_id
 
     # 동영상 처리 완료 후 진행도 50으로 설정
     progress = 50
-    task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+    task_data['date_done'] = datetime.now().isoformat()
     task_data['meta']['progress'] = progress
     redis_client.set(task_key, json.dumps(task_data))
 

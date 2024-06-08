@@ -22,7 +22,7 @@ then
     echo "Celery worker is already running"
 else
     echo "Starting Celery worker..."
-    celery -A web_demo worker --loglevel=info &
+    celery -A web_demo worker --loglevel=info --pool=threads &
     if [ $? -ne 0 ]; then
         echo "Failed to start Celery worker"
         exit 1

@@ -1,5 +1,12 @@
 # web_demo/celery_app.py
 from __future__ import absolute_import, unicode_literals
+import multiprocessing
+
+# 'spawn' 시작 방법 설정
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass  # 이미 설정된 경우 무시
 from celery import Celery
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
