@@ -318,11 +318,21 @@ def get_reid_result_top10(query_features_attr, gallery_features_attr, FILTERING_
     distances = {}
     for path, features in filtered_gallery_features_dict.items():
         gallery_vector = np.array(features)
-        print(f"query dim: {query_vector.ndim}, gallery dim: {gallery_vector.ndim}")
-        print(f"query vector: {query_vector}, len: {query_vector.shape[0]}")
-        print(f"gallery vector: {gallery_vector}, len: {gallery_vector.shape[0]}")
+        # print(f"query dim: {query_vector.ndim}, gallery dim: {gallery_vector.ndim}")
+        # print(f"query vector: {query_vector}, len: {query_vector.shape[0]}")
+        # print(f"gallery vector: {gallery_vector}, len: {gallery_vector.shape[0]}")
+        
+        if np.any(np.isnan(query_vector)):
+            print(f"Warning: query contains NaN values")
+        if np.any(np.isinf(query_vector)):
+            print(f"Warning: query contains infinite values")
+        if np.any(np.isnan(gallery_vector)):
+            print(f"Warning: gallery contains NaN values")
+        if np.any(np.isinf(gallery_vector)):
+            print(f"Warning: gallery contains infinite values")
+
         # 유클리드 거리 계산
-        distance = np.linalg.norm(query_vector, gallery_vector)
+        distance = np.linalg.norm(query_vector - gallery_vector)
         distances[path] = distance
         i += 1
         if i % update_interval == 0:
