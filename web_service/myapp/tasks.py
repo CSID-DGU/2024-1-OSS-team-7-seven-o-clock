@@ -32,7 +32,7 @@ def load_data_from_pkl(filename):
 @shared_task(bind=True)
 def start_re_id_task(self, dataset_name: str, query_img_path: str) -> None:
     # 작업 초기 상태 설정
-    self.update_state(state='PROGRESS', meta={'progress': 0, 'total': 100})
+    self.update_state(status='PROGRESS', meta={'progress': 0, 'total': 100})
     # gallery feat_attr 가져오기
     gallery_feat_attr_pkl_save_path = '/root/amd/reid_model/datasets/' + dataset_name + '/meta/feature_attr.pkl'
 
@@ -49,14 +49,14 @@ def start_re_id_task(self, dataset_name: str, query_img_path: str) -> None:
     
     reid_result_img_path_list = get_reid_result_top10(query_features_attr=query_feat_attr_dict, gallery_features_attr=gallery_feat_attr_dict, task_id=self.request.id)
 
-    # self.update_state(state='SUCCESS', meta={'progress': 100, 'total': 100})
+    # self.update_state(status='SUCCESS', meta={'progress': 100, 'total': 100})
     return reid_result_img_path_list
 
 @shared_task(bind=True)
 def register_dataset(self, dataset_name: str, video_path: str) -> bool:
     task_id = self.request.id
     # 작업 초기 상태 설정
-    self.update_state(state='PROGRESS', meta={'progress': 0, 'total': 100})
+    self.update_state(status='PROGRESS', meta={'progress': 0, 'total': 100})
 
     dataset_names_dict = {}
     with open(os.path.join(settings.BASE_DIR, 'datasets.json')) as f:
@@ -88,5 +88,5 @@ def register_dataset(self, dataset_name: str, video_path: str) -> bool:
     regist_new_dataset(args=args, dataset_path=dataset_save_path, save_path=feat_attr_pkl_save_path, task_id=task_id)
     
 
-    # self.update_state(state='SUCCESS', meta={'progress': 100, 'total': 100})
+    # self.update_state(status='SUCCESS', meta={'progress': 100, 'total': 100})
     return True

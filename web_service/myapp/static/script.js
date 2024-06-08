@@ -107,11 +107,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.ok) {
                 const result = await response.json();
-                updateProgress(result.current, result.total);
+                console.log("result: ", result)
+                updateProgress(result.progress, result.total);
 
                 if (result.state === 'SUCCESS') {
                     onSuccess(result.result);
                     clearInterval(taskStatusInterval); // Stop checking after success
+                } else if (result.state === 'PROGRESS'){
+                    /* 재식별 버튼 또는 데이터셋 생성 버튼의 글자를 지우고 대신 실행중이라는 걸 보여주는 아이콘..?  */
                 } else if (result.state === 'FAILURE') {
                     alert('작업 실패.');
                     clearInterval(taskStatusInterval); // Stop checking after failure

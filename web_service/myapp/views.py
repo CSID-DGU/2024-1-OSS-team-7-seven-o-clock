@@ -112,11 +112,22 @@ def get_state(request, task_id):
         return JsonResponse({ "status": "FAILED" })
     
     result = None
+    progress = 0
+    total = 100
 
     # 작업이 준비된 경우 결과를 가져옴
     if async_result.ready():
         result = async_result.get()
+        print(f"작업이 완료됨: {result}")
+    elif async_result.status == 'PROGRESS':
+        progress = async_result.info.get('progress', 0)
+        total = async_result.info.get('total', 100)
 
-    return JsonResponse({ "state": async_result.status, "result": result })
+    return JsonResponse({
+        "state": async_result.status,
+        "result": result,
+        "progress": progress,
+        "total": total
+    })
 
 
