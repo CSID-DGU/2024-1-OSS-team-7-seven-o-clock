@@ -34,7 +34,7 @@ from projects.InterpretationReID.interpretationreid.utils.logger import setup_lo
 from . import hooks
 from .train_loop import SimpleTrainer
 
-__all__ = ["default_argument_parser", "default_setup", "DefaultPredictor", "DefaultTrainer"]
+__all__ = ["default_argument_parser", "subprocess_argument_parser", "default_setup", "DefaultPredictor", "DefaultTrainer"]
 
 
 def default_argument_parser():
@@ -72,6 +72,41 @@ def default_argument_parser():
     )
     return parser
 
+def subprocess_argument_parser():
+    """
+    Create a parser with some common arguments used by fastreid users.
+    Returns:
+        argparse.ArgumentParser:
+    """
+
+    parser = argparse.ArgumentParser(description="fastreid Training")
+    #마켓 1501
+    parser.add_argument("--config-file", default="/root/amd/reid_model/projects/InterpretationReID/configs/Market1501_Circle/circle_R50_ip_eval_only.yml", metavar="FILE", help="path to config file")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="whether to attempt to resume from the checkpoint directory",
+    )
+    # eval_only default 0 => 1
+    parser.add_argument("--eval-only", default=1,action="store_true", help="perform evaluation only")
+    parser.add_argument("--num-gpus", type=int, default=1, help="number of gpus *per machine*")
+    parser.add_argument("--num-machines", type=int, default=1, help="total number of machines")
+    parser.add_argument(
+        "--machine-rank", type=int, default=0, help="the rank of this machine (unique per machine)"
+    )
+
+    # PyTorch still may leave orphan processes in multi-gpu training.
+    # Therefore we use a deterministic way to obtain port,
+    # so that users are aware of orphan processes by seeing the port occupied.
+    port = 2 ** 15 + 2 ** 14 + hash(os.getuid() if sys.platform != "win32" else 1) % 2 ** 14
+    parser.add_argument("--dist-url", default="tcp://127.0.0.1:{}".format(port))
+    parser.add_argument(
+        "opts",
+        help="Modify config options using the command-line",
+        default=None,
+        nargs=argparse.REMAINDER,
+    )
+    return parser
 
 def default_setup(cfg, args):
     """

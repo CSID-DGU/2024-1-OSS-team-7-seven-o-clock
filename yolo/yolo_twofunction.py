@@ -105,9 +105,9 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str, task_id
     update_interval = total_frames // 50
     progress = 0
 
-    crop_dir_name = os.path.join(dataset_save_path, dataset_name) #저장폴더 만들기
-    if not os.path.exists(crop_dir_name):
-        os.makedirs(crop_dir_name) 
+    #저장폴더 만들기
+    if not os.path.exists(dataset_save_path):
+        os.makedirs(dataset_save_path) 
 
     frame_count = 0 
     while cap.isOpened():#이미지 한장한장 뽑아오면서 돌리기
@@ -122,7 +122,7 @@ def yolo_vid(dataset_name: str, video_path: str, dataset_save_path: str, task_id
             for box in boxes: #잘라서 저장
                 idx += 1
                 crop_obj = im0[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
-                image_path = os.path.join(crop_dir_name, f"{dataset_name}_{idx}.png")
+                image_path = os.path.join(dataset_save_path, f"{dataset_name}_{idx}.jpg")
                 cv2.imwrite(image_path, crop_obj)
                 absolute_path = os.path.abspath(image_path)
                 absolute_paths.append(absolute_path)

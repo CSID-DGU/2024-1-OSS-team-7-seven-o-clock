@@ -18,7 +18,7 @@ sys.path.append('.')
 os.chdir("/root/amd/reid_model") #/home/workspace/로 이동하는것 방지 
 
 from fastreid.config import get_cfg
-from projects.InterpretationReID.interpretationreid.engine import DefaultTrainer, default_argument_parser, default_setup, launch
+from projects.InterpretationReID.interpretationreid.engine import DefaultTrainer, default_argument_parser, default_setup, launch, subprocess_argument_parser
 from fastreid.utils.checkpoint import Checkpointer
 from projects.InterpretationReID.interpretationreid.evaluation import ReidEvaluator_General, ReidEvaluator
 import projects.InterpretationReID.interpretationreid as PII
@@ -141,8 +141,11 @@ class Trainer(DefaultTrainer):
 
         total = len(data_loader) 
         update_interval = total // 50
+        if update_interval == 0:
+            update_interval = total
+        print(f"[general_evalution.py, test_celery] total_len: {total}, update_interval: {update_interval}")
         progress = 50
-        i = 0
+        i = 1
         with torch.no_grad():
             for idx, inputs in enumerate(data_loader):
                 i += 1
@@ -176,6 +179,8 @@ class Trainer(DefaultTrainer):
 
             
 def save_data_as_pkl(data, filename):
+    if not os.path.exists(os.path.dirname(filename)):
+        os.makedirs(os.path.dirname(filename)) 
     with open(filename, 'wb') as f:
         pickle.dump(data, f)
 def load_data_from_pkl(filename):
@@ -205,7 +210,7 @@ def regist_dataset(dataset_path):
     # ( '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/bounding_box_test/0330_c5s1_075798_04.jpg', 330, 4, tensor([-1., -1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1., -1., -1.,  1., 1., -1.,  1.,  1., -1., -1., -1., -1., -1.,  1., -1., -1.]) )
     dataset = []
     img_paths = []
-    print(f"dataset_path: {dataset_path}")
+    print(f"[general_evalution.py, regist_dataset]dataset_path: {dataset_path}")
     for filename in os.listdir(dataset_path):
         if filename.endswith('.jpg'):
             img_paths.append(filename)
@@ -242,8 +247,9 @@ def regist_new_dataset(args, dataset_path, save_path):
 
 # celery를 사용하는 버전 
 def regist_new_dataset(args, dataset_path, save_path, task_id):
-    args = default_argument_parser().parse_args()
-    cfg = setup(args)
+    
+    arg = default_argument_parser().parse_args(args=args.split())
+    cfg = setup(arg)
 
     cfg.defrost()
     cfg.MODEL.BACKBONE.PRETRAIN = False
