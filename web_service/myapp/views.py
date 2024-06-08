@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.shortcuts import render
 from myapp import tasks
+from web_demo import settings
 from web_demo.celery_app import app
 from django.http import HttpRequest
 from django.views.decorators.csrf import csrf_exempt
@@ -14,6 +15,8 @@ import os
 import shutil
 from django.conf import settings
 import json
+from datetime import datetime
+from pathlib import Path
 
 def main_view(request):
     return render(request, 'index.html')
@@ -35,16 +38,22 @@ def start_re_id(request: HttpRequest):
     if request.method != 'POST':
         return JsonResponse({ }, status=405)
     
-    request.upload_handlers = [TemporaryFileUploadHandler(request=request)]
 
-    # 데이터 전처리를 진행
+
+    image_path = None
     form = StartReIdForm(request.POST, request.FILES)
-    if not form.is_valid():
+    if form.is_valid():
+        # FileSystemStorage를 사용하여 파일을 저장합니다.
+        query_file = form.cleaned_data['query_file']
+        fs = FileSystemStorage()
+        filename = fs.save(str(datetime.now())+query_file.name, query_file)
+        image_path = os.path.join(settings.MEDIA_ROOT, filename)
+    else: 
         return JsonResponse({}, status=400)
-    
     # 데이터셋 이름을 가져옴
     dataset = form.cleaned_data['dataset_name']
 
+    '''
     # 이미지가 저장된 임시 경로를 가져옴
     tmp_image_path = cast(TemporaryUploadedFile, form.cleaned_data['query_file']).temporary_file_path()
 
@@ -56,11 +65,12 @@ def start_re_id(request: HttpRequest):
 
     # 파일을 현재 경로로 이동
     shutil.move(tmp_image_path, image_path)
+    '''
 
     # 작업 요청
     async_result = tasks.start_re_id_task.delay(dataset, image_path)
 
-    return JsonResponse({ "id": async_result.id })
+    return JsonResponse({ "task_id": async_result.id })
 
 @csrf_exempt
 def regist_dataset(request: HttpRequest):
@@ -92,7 +102,7 @@ def regist_dataset(request: HttpRequest):
 
     # 작업 요청
     async_result = tasks.register_dataset.delay(dataset, video)
-    return JsonResponse({ "id": async_result.id })
+    return JsonResponse({ "task_id": async_result.id })
     
 @csrf_exempt
 def get_state(request, task_id):
@@ -107,6 +117,6 @@ def get_state(request, task_id):
     if async_result.ready():
         result = async_result.get()
 
-    return JsonResponse({ "status": async_result.status, "result": result })
+    return JsonResponse({ "state": async_result.status, "result": result })
 
 

@@ -35,25 +35,21 @@ def start_re_id_task(self, dataset_name: str, query_img_path: str) -> None:
     self.update_state(state='PROGRESS', meta={'progress': 0, 'total': 100})
     # gallery feat_attr 가져오기
     gallery_feat_attr_pkl_save_path = '/root/amd/reid_model/datasets/' + dataset_name + '/meta/feature_attr.pkl'
-    try:
-        gallery_feat_attr_dict = load_data_from_pkl(gallery_feat_attr_pkl_save_path)
-    except:
-        print("데이터셋 등록이 정상적으로 안 되어 있음.")
-        exit()
+
+    gallery_feat_attr_dict = load_data_from_pkl(gallery_feat_attr_pkl_save_path)
+
     # query img의 feat, attr 구하기
     
 
     args = "--config-file /root/amd/reid_model/projects/InterpretationReID/configs/Market1501_Circle/circle_R50_ip_eval_only.yml --eval-only  MODEL.DEVICE \"cuda:0\" "
     query_feat_attr_dict = {}
-    try:
-        query_feat_attr_dict = regist_new_dataset(args=args, dataset_path=query_img_path, save_path=None, task_id=None)
-    except:
-        print("데이터셋 등록 후 feat, attr 계산 중 오류 발생")
-        exit()
+    
+    query_feat_attr_dict = regist_new_dataset(args=args, dataset_path=query_img_path, save_path=None, task_id=self.request.id, one_file=True)
+    
     
     reid_result_img_path_list = get_reid_result_top10(query_features_attr=query_feat_attr_dict, gallery_features_attr=gallery_feat_attr_dict, task_id=self.request.id)
 
-    self.update_state(state='SUCCESS', meta={'progress': 100, 'total': 100})
+    # self.update_state(state='SUCCESS', meta={'progress': 100, 'total': 100})
     return reid_result_img_path_list
 
 @shared_task(bind=True)
@@ -92,5 +88,5 @@ def register_dataset(self, dataset_name: str, video_path: str) -> bool:
     regist_new_dataset(args=args, dataset_path=dataset_save_path, save_path=feat_attr_pkl_save_path, task_id=task_id)
     
 
-    self.update_state(state='SUCCESS', meta={'progress': 100, 'total': 100})
+    # self.update_state(state='SUCCESS', meta={'progress': 100, 'total': 100})
     return True

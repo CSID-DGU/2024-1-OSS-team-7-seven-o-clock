@@ -114,7 +114,7 @@ class Trainer(DefaultTrainer):
     
     # celery를 사용하는 버전
     @classmethod
-    def test_celery(cls, cfg, model, task_id, evaluators=None):
+    def test_celery(cls, cfg, model, task_id, evaluators=None, one_file = False):
         redis_client = create_redis_client()
         task_key = f'celery-task-meta-{task_id}'
 
@@ -131,7 +131,11 @@ class Trainer(DefaultTrainer):
         if 'meta' not in task_data:
             print("task_data에 'meta' 키가 없습니다.")
             task_data['meta'] = {}  # 'meta' 키가 없는 경우 새로 생성
-        img_dataset = regist_dataset(cls.dataset_path)
+        if one_file:
+            img_dataset = regist_dataset_file(cls.dataset_path)
+        else:
+            img_dataset = regist_dataset(cls.dataset_path)
+
         data_loader, num_query , name_of_attribute = cls.build_test_loader(cfg, img_dataset)
         evaluator = cls.build_evaluator(cfg, num_query=num_query)
         # model을 평가 모드로 전환
@@ -218,6 +222,17 @@ def regist_dataset(dataset_path):
         dataset.append((dataset_path + "/" + img_path, pid, camid, p_attr))
     return dataset
 
+def regist_dataset_file(file_path):
+    pid = 0
+    camid = 0
+    p_attr = torch.full((26,), 0)
+    # ( '/root/amd/reid_model/datasets/Market-1501-v24.05.21_junk_false/bounding_box_test/0330_c5s1_075798_04.jpg', 330, 4, tensor([-1., -1.,  1.,  1.,  1., -1., -1., -1., -1., -1., -1., -1., -1.,  1., 1., -1.,  1.,  1., -1., -1., -1., -1., -1.,  1., -1., -1.]) )
+    dataset = []
+    img_paths = []
+    print(f"[general_evalution.py, regist_dataset]dataset_path: {file_path}")
+    dataset.append((file_path, pid, camid, p_attr))
+    return dataset
+
 
 def setup(args):
     """
@@ -246,8 +261,7 @@ def regist_new_dataset(args, dataset_path, save_path):
     return res
 
 # celery를 사용하는 버전 
-def regist_new_dataset(args, dataset_path, save_path, task_id):
-    
+def regist_new_dataset(args, dataset_path, save_path, task_id, one_file=False):
     arg = default_argument_parser().parse_args(args=args.split())
     cfg = setup(arg)
 
@@ -257,7 +271,7 @@ def regist_new_dataset(args, dataset_path, save_path, task_id):
 
     Checkpointer(model).load(cfg.MODEL.WEIGHTS)  # load trained model
     if task_id != None:
-        res = Trainer.test_celery(cfg, model, task_id=task_id)
+        res = Trainer.test_celery(cfg, model, task_id=task_id, one_file=one_file)
     else:
         res = Trainer.test(cfg, model)
     if save_path != None:

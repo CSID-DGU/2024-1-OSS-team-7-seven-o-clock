@@ -8,8 +8,10 @@ import os
 import torch
 import shutil
 from concurrent.futures import ProcessPoolExecutor
-import asyncio, redis, json, datetime
+import asyncio, redis, json
+from datetime import datetime
 
+redis_client = None
 
 def save_data_as_pkl(data, filename):
     with open(filename, 'wb') as f:
@@ -278,19 +280,15 @@ def get_reid_result_top10(query_features_attr, gallery_features_attr, FILTERING_
         if FILTERING_METHOD == "top":
             query_fake_up_set = get_topk_colors(query_attr[query_img_path], 18, 26, TOP_UP_K)
             query_fake_down_set = get_topk_colors(query_attr[query_img_path], 4, 13, TOP_DOWN_K)
-        elif FILTERING_METHOD == "over05":
-            query_fake_up_set = get_over_n_colors(query_attr[query_img_path], 18, 26, THRESHOLD)
-            query_fake_down_set = get_over_n_colors(query_attr[query_img_path], 4, 13, THRESHOLD)
+
 
         i = 0
-        
+        print(f"query up: {query_fake_up_set}, down: {query_fake_down_set}")
         for gallery_img_path in gallery_img_path_list:
             if FILTERING_METHOD == "top":
                 gallery_fake_up_set = get_topk_colors(gallery_attr[gallery_img_path], 18, 26, TOP_UP_K)
                 gallery_fake_down_set = get_topk_colors(gallery_attr[gallery_img_path], 4, 13, TOP_DOWN_K)
-            elif FILTERING_METHOD == "over05":
-                gallery_fake_up_set = get_over_n_colors(gallery_attr[gallery_img_path], 18, 26, THRESHOLD)
-                gallery_fake_down_set = get_over_n_colors(gallery_attr[gallery_img_path], 4, 13, THRESHOLD)
+
 
 
             # 모델 예측 쿼리, 갤러리 상하의 색상이 둘다 동일하면 갤러리에 등록
@@ -300,18 +298,19 @@ def get_reid_result_top10(query_features_attr, gallery_features_attr, FILTERING_
             if i % update_interval == 0:
                 # celery task status update 코드
                 progress += 1
-                task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+                task_data['date_done'] = datetime.now().isoformat()
                 task_data['meta']['progress'] = progress
                 redis_client.set(task_key, json.dumps(task_data))
     
-
     total = len(filtered_gallery_features_dict) 
     update_interval = total // 50
+    if update_interval == 0:
+        update_interval = total
     progress = 50
     # query 는 하나의 이미지임.
-    query_img_path = query_img_path[0] 
+    query_img_path = list(query_img_path_list)[0] 
     # Query 벡터를 numpy 배열로 변환
-    query_vector = np.array(query_features_attr['query_img_path'])
+    query_vector = np.array(query_features_attr[query_img_path][0])
 
 
     i = 0
@@ -319,6 +318,9 @@ def get_reid_result_top10(query_features_attr, gallery_features_attr, FILTERING_
     distances = {}
     for path, features in filtered_gallery_features_dict.items():
         gallery_vector = np.array(features)
+        print(f"query dim: {query_vector.ndim}, gallery dim: {gallery_vector.ndim}")
+        print(f"query vector: {query_vector}, len: {query_vector.shape[0]}")
+        print(f"gallery vector: {gallery_vector}, len: {gallery_vector.shape[0]}")
         # 유클리드 거리 계산
         distance = np.linalg.norm(query_vector, gallery_vector)
         distances[path] = distance
@@ -326,7 +328,7 @@ def get_reid_result_top10(query_features_attr, gallery_features_attr, FILTERING_
         if i % update_interval == 0:
             # celery task status update 코드
             progress += 1
-            task_data['date_done'] = datetime.now(datetime.UTC).isoformat()
+            task_data['date_done'] = datetime.now().isoformat()
             task_data['meta']['progress'] = progress
             redis_client.set(task_key, json.dumps(task_data))
 

@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('reidentify-btn').addEventListener('click', function () {
         document.getElementById('reidentify-section').classList.remove('hidden');
         document.getElementById('create-dataset-section').classList.add('hidden');
+        fetchDatasets();
     });
 
     document.getElementById('create-dataset-btn').addEventListener('click', function () {
@@ -100,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function checkTaskStatus(taskId, updateProgress, onSuccess) {
         try {
-            const response = await fetch(`http://localhost:8080/get_state?task_id=${taskId}`, {
+            const response = await fetch(`http://localhost:8080/get_state/${taskId}`, {
                 method: 'GET'
             });
 

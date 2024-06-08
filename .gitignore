@@ -19,3 +19,4 @@ reid_model/pretrain_models/*
 /label_manager/dataset/**/*.png
 /label_manager/dataset/**/*.mat
 /**/*.pkl
+web_service/media/*.jpg
