@@ -16,9 +16,19 @@ from django.conf import settings
 import json
 
 def main_view(request):
-    # 비동기적으로 Celery 태스크를 실행
-    async_result = tasks.add.delay('dataset', '')
-    return render(request, 'main.html', {'task_id': async_result.id})
+    return render(request, 'index.html')
+
+def get_datasets(request):
+    dataset_names_dict = {}
+    with open(os.path.join(settings.BASE_DIR, 'datasets.json')) as f:
+        dataset_names_dict = json.load(f)
+    dataset_names = None
+    try: 
+        dataset_names = json.dumps(list(dataset_names_dict.keys()))
+    except:
+        print("json dumps err")
+    dataset_names = list(dataset_names_dict.keys())
+    return JsonResponse({'datasetList': dataset_names}, status=200)
 
 @csrf_exempt
 def start_re_id(request: HttpRequest):

@@ -7,11 +7,11 @@ import json, pickle
 
 # 재식별을 위한 파이썬 파일
 sys.path.append('/root/amd/reid_model')
-from reid_model.projects.InterpretationReID.general_evaluation import regist_new_dataset
-from reid_model.projects.InterpretationReID.final_total_filtering_jy_multi_process import get_reid_result_top10
+from projects.InterpretationReID.general_evaluation import regist_new_dataset
+from projects.InterpretationReID.final_total_filtering_jy_multi_process import get_reid_result_top10
 
 sys.path.append('/root/amd/yolo')
-from yolo.yolo_twofunction import yolo_vid
+from yolo_twofunction import yolo_vid
 
 # 아래는 /root/amd/yolo/myYolo.py 에서 yolo_vid 메소드를 임포트 하는 방법
 # from yolo.myYolo import yolo_vid
