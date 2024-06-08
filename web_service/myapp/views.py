@@ -43,10 +43,10 @@ def start_re_id(request: HttpRequest):
         return JsonResponse({}, status=400)
     
     # 데이터셋 이름을 가져옴
-    dataset = form.cleaned_data['dataset']
+    dataset = form.cleaned_data['dataset_name']
 
     # 이미지가 저장된 임시 경로를 가져옴
-    tmp_image_path = cast(TemporaryUploadedFile, form.cleaned_data['image']).temporary_file_path()
+    tmp_image_path = cast(TemporaryUploadedFile, form.cleaned_data['query_file']).temporary_file_path()
 
     # 파일 확장자를 가져옴
     file_name, ext = os.path.splitext(tmp_image_path)
@@ -68,11 +68,12 @@ def regist_dataset(request: HttpRequest):
         return JsonResponse({ }, status=405)
     
     request.upload_handlers = [TemporaryFileUploadHandler(request=request)]
-
+    print("Request POST data:", request.POST)
+    print("Request FILES data:", request.FILES)
     # 데이터 전처리를 진행
     form = RegistDataset(request.POST, request.FILES)
     if not form.is_valid():
-        print(form.errors)
+        print("FORM ERROR", form.errors)
         return JsonResponse({}, status=400)
     
     datasets = {}
@@ -80,14 +81,14 @@ def regist_dataset(request: HttpRequest):
         datasets = json.load(f)
     
     # 데이터셋 이름을 가져옴
-    dataset = form.cleaned_data['dataset']
+    dataset = form.cleaned_data['dataset_name']
 
     # 데이터셋 이름이 존재하는지 확인
     if dataset in datasets:
         return JsonResponse({ "success": False, "message": "이미 존재하는 데이터셋 이름입니다" }, status=409)
 
     # 영상이 저장된 임시 경로를 가져옴
-    video = cast(TemporaryUploadedFile, form.cleaned_data['video']).temporary_file_path()
+    video = cast(TemporaryUploadedFile, form.cleaned_data['dataset_base']).temporary_file_path()
 
     # 작업 요청
     async_result = tasks.register_dataset.delay(dataset, video)

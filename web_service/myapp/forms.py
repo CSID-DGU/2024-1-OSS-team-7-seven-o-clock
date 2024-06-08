@@ -2,9 +2,9 @@ from django import forms
 
 
 class StartReIdForm(forms.Form):
-    dataset = forms.CharField()
-    image = forms.ImageField()
+    dataset_name = forms.CharField()
+    query_file = forms.ImageField()
 
 class RegistDataset(forms.Form):
-    dataset = forms.CharField()
-    video = forms.FileField()
+    dataset_name = forms.CharField()
+    dataset_base = forms.FileField()
