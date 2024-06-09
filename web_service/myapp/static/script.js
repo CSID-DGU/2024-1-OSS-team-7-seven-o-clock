@@ -8,11 +8,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const datasetUpload = document.getElementById('dataset-upload');
     const progressBarDataset = document.getElementById('progress-bar-dataset');
 
-    if (!queryUpload || !datasetSelect || !startReidBtn || !progressBarReid || !resultReid || !createDatasetBtn || !datasetUpload || !progressBarDataset) {
-        console.error('필요한 요소를 찾을 수 없습니다.');
-        return;
-    }
-
     document.getElementById('reidentify-btn').addEventListener('click', function () {
         document.getElementById('reidentify-section').classList.remove('hidden');
         document.getElementById('create-dataset-section').classList.add('hidden');
@@ -99,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function () {
         handleFileUpload(file, 'dataset-upload');
     });
 
-    async function checkTaskStatus(taskId, onSuccess) {
+    async function checkTaskStatus(taskId) {
         try {
             const response = await fetch(`http://localhost:8080/get_state/${taskId}`, {
                 method: 'GET'
@@ -110,12 +105,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log("result: ", result);
 
                 if (result.state === 'SUCCESS') {
-                    onSuccess(result.result);
+                    displayResults(result.result);
                     clearInterval(taskStatusInterval);
                     startReidBtn.disabled = false;
                     createDatasetBtn.disabled = false;
                     startReidBtn.innerText = "Start re-id";
                     createDatasetBtn.innerText = "생성";
+                    // 결과가 표시된 후 페이지를 아래로 스크롤
+                    resultReid.scrollIntoView({ behavior: 'smooth' });
                 } else if (result.state === 'PROGRESS') {
                     startReidBtn.disabled = true;
                     createDatasetBtn.disabled = true;
@@ -137,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-
     function updateProgress(progressBar, current, total) {
         const percentage = (current / total) * 100;
         progressBar.style.width = `${percentage}%`;
@@ -146,17 +142,31 @@ document.addEventListener('DOMContentLoaded', function () {
     function displayResults(results) {
         resultReid.innerHTML = '';
 
+        // 선택된 데이터셋 이름을 가져옵니다.
+        const datasetName = datasetSelect.value;
+
+        /getImgs
+        {
+            resultImgPathList: ['~~~', '~~~']
+        }
+
         results.forEach(result => {
             const img = new Image();
             img.onload = function () {
                 resultReid.appendChild(img);
                 resultReid.classList.remove('hidden');
             };
-            img.src = result;
+            // 이미지 파일 이름을 추출합니다.
+            const imgName = result.split('/').pop(); // 파일 이름 추출
+
+            // 새로운 동적 경로를 구성합니다.
+            const imgPath = `/root/amd/reid_model/datasets/${datasetName}/imgs/${imgName}`;
+            img.src = imgPath;
             img.alt = 'Loaded Image';
         });
 
         if (results.length === 0) {
+            resultReid.innerHTML = '<p>결과가 없습니다.</p>';
             resultReid.classList.remove('hidden');
         }
     }
@@ -181,11 +191,6 @@ document.addEventListener('DOMContentLoaded', function () {
         formData.append('dataset_name', datasetValue);
 
         try {
-            // FormData 내용을 확인
-            for (let pair of formData.entries()) {
-                console.log(pair[0] + ', ' + pair[1]);
-            }
-
             const response = await fetch('http://localhost:8080/start_re_id', {
                 method: 'POST',
                 body: formData
@@ -200,13 +205,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 console.log('Task ID:', taskId);
-                taskStatusInterval = setInterval(() => checkTaskStatus(taskId, (current, total) => {
-                    updateProgress(progressBarReid.querySelector('.progress-bar'), current, total);
-                    if (current === total) {
-                        alert('재식별 완료.');
-                        progressBarReid.classList.add('hidden');
-                    }
-                }, displayResults), 5000); // Check status every 5 seconds
+                taskStatusInterval = setInterval(() => checkTaskStatus(taskId), 5000); // Check status every 5 seconds
             } else {
                 alert('재식별 실패.');
             }
@@ -237,7 +236,6 @@ document.addEventListener('DOMContentLoaded', function () {
         createDatasetBtn.disabled = true; // 버튼 비활성화
         createDatasetBtn.innerText = "실행 중"; // 버튼 텍스트 변경
 
-
         const formData = new FormData();
         formData.append('dataset_base', datasetFile);
         formData.append('dataset_name', datasetName);
@@ -257,13 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 console.log('Task ID:', taskId);
-                taskStatusInterval = setInterval(() => checkTaskStatus(taskId, (current, total) => {
-                    updateProgress(progressBarDataset.querySelector('.progress-bar'), current, total);
-                    if (current === total) {
-                        alert('데이터셋 생성 완료.');
-                        progressBarDataset.classList.add('hidden');
-                    }
-                }, () => { }), 5000); // Check status every 5 seconds
+                taskStatusInterval = setInterval(() => checkTaskStatus(taskId), 5000); // Check status every 5 seconds
             } else {
                 alert('데이터셋 생성 실패.');
             }

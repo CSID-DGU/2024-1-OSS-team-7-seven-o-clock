@@ -1,3 +1,5 @@
+/* 기존 스타일 유지 */
+
 body {
     font-family: 'Helvetica Neue', sans-serif;
     background-color: #f7f9fc;
@@ -10,7 +12,6 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh;
     width: 90%;
     max-width: 1200px;
     margin: 0 auto;
@@ -60,7 +61,6 @@ h1 {
 #create-dataset-btn:hover {
     background-color: #218838;
 }
-
 
 .section {
     width: 100%;
@@ -187,4 +187,15 @@ img {
 
 #create-dataset-btn-2:hover {
     background-color: #218838;
+}
+
+#result-reid {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px solid #ddd;
 }
