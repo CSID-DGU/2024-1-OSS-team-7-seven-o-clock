@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function () {
         handleFileUpload(file, 'dataset-upload');
     });
 
-    async function checkTaskStatus(taskId, updateProgress, onSuccess) {
+    async function checkTaskStatus(taskId, onSuccess) {
         try {
             const response = await fetch(`http://localhost:8080/get_state/${taskId}`, {
                 method: 'GET'
@@ -107,17 +107,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (response.ok) {
                 const result = await response.json();
-                console.log("result: ", result)
-                updateProgress(result.progress, result.total);
+                console.log("result: ", result);
 
                 if (result.state === 'SUCCESS') {
                     onSuccess(result.result);
-                    clearInterval(taskStatusInterval); // Stop checking after success
-                } else if (result.state === 'PROGRESS'){
-                    /* 재식별 버튼 또는 데이터셋 생성 버튼의 글자를 지우고 대신 실행중이라는 걸 보여주는 아이콘..?  */
+                    clearInterval(taskStatusInterval);
+                    startReidBtn.disabled = false;
+                    createDatasetBtn.disabled = false;
+                    startReidBtn.innerText = "Start re-id";
+                    createDatasetBtn.innerText = "생성";
+                } else if (result.state === 'PROGRESS') {
+                    startReidBtn.disabled = true;
+                    createDatasetBtn.disabled = true;
+                    startReidBtn.innerText = "실행 중";
+                    createDatasetBtn.innerText = "실행 중";
                 } else if (result.state === 'FAILURE') {
                     alert('작업 실패.');
-                    clearInterval(taskStatusInterval); // Stop checking after failure
+                    clearInterval(taskStatusInterval);
+                    startReidBtn.disabled = false;
+                    createDatasetBtn.disabled = false;
+                    startReidBtn.innerText = "Start re-id";
+                    createDatasetBtn.innerText = "생성";
                 }
             } else {
                 alert('상태 조회 실패.');
@@ -126,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('Error:', error);
         }
     }
+
 
     function updateProgress(progressBar, current, total) {
         const percentage = (current / total) * 100;
@@ -137,13 +148,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         results.forEach(result => {
             const img = document.createElement('img');
-            img.src = `data:${result.content_type};base64,${result.data}`;
-            img.alt = result.name;
+            img.src = result;
+            img.alt = 'Loaded Image';
             resultReid.appendChild(img);
         });
 
         resultReid.classList.remove('hidden');
     }
+
 
     let taskStatusInterval;
 
