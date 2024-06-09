@@ -17,6 +17,11 @@ from django.conf import settings
 import json
 from datetime import datetime
 from pathlib import Path
+import base64
+from PIL import Image
+from io import BytesIO
+from urllib.parse import unquote
+
 
 def main_view(request):
     return render(request, 'index.html')
@@ -130,4 +135,24 @@ def get_state(request, task_id):
         "total": total
     })
 
+def encode_image_to_base64(image_path):
+    try:
+        with Image.open(image_path) as image:
+            buffered = BytesIO()
+            image.save(buffered, format="JPEG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    except Exception as e:
+        return None
 
+def get_imgs(request):
+    image_paths = request.GET.getlist('resultImgPathList')
+    if not image_paths:
+        return JsonResponse({'error': 'No image paths provided'}, status=400)
+    
+    image_paths = [unquote(path) for path in image_paths]  # URL 디코딩
+    encoded_images = [encode_image_to_base64(image_path) for image_path in image_paths]
+    
+    if None in encoded_images:
+        return JsonResponse({'error': 'One or more images could not be processed'}, status=500)
+    
+    return JsonResponse({'resultImgList': encoded_images})

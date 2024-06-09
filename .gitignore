@@ -20,3 +20,4 @@ reid_model/pretrain_models/*
 /label_manager/dataset/**/*.mat
 /**/*.pkl
 web_service/media/*.jpg
+reid_model/yolov8n.onnx
