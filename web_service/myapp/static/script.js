@@ -147,15 +147,19 @@ document.addEventListener('DOMContentLoaded', function () {
         resultReid.innerHTML = '';
 
         results.forEach(result => {
-            const img = document.createElement('img');
+            const img = new Image();
+            img.onload = function () {
+                resultReid.appendChild(img);
+                resultReid.classList.remove('hidden');
+            };
             img.src = result;
             img.alt = 'Loaded Image';
-            resultReid.appendChild(img);
         });
 
-        resultReid.classList.remove('hidden');
+        if (results.length === 0) {
+            resultReid.classList.remove('hidden');
+        }
     }
-
 
     let taskStatusInterval;
 
@@ -169,6 +173,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         progressBarReid.classList.remove('hidden');
+        startReidBtn.disabled = true; // 버튼 비활성화
+        startReidBtn.innerText = "실행 중"; // 버튼 텍스트 변경
 
         const formData = new FormData();
         formData.append('query_file', queryFile);
@@ -207,6 +213,9 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             alert(`에러 발생: ${error.message}`);
             console.error('Error:', error);
+        } finally {
+            startReidBtn.disabled = false; // 버튼 활성화
+            startReidBtn.innerText = "Start re-id"; // 버튼 텍스트 원래대로
         }
     });
 
@@ -225,6 +234,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         progressBarDataset.classList.remove('hidden');
+        createDatasetBtn.disabled = true; // 버튼 비활성화
+        createDatasetBtn.innerText = "실행 중"; // 버튼 텍스트 변경
+
 
         const formData = new FormData();
         formData.append('dataset_base', datasetFile);
@@ -258,6 +270,9 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             alert(`에러 발생: ${error.message}`);
             console.error('Error:', error);
+        } finally {
+            createDatasetBtn.disabled = false; // 버튼 활성화
+            createDatasetBtn.innerText = "생성"; // 버튼 텍스트 원래대로
         }
     });
 
