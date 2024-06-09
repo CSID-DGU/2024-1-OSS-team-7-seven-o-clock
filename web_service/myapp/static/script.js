@@ -241,9 +241,8 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             alert(`에러 발생: ${error.message}`);
             console.error('Error:', error);
-        } finally {
-            startReidBtn.disabled = false; // 버튼 활성화
-            startReidBtn.innerText = "Start re-id"; // 버튼 텍스트 원래대로
+            startReidBtn.disabled = false; // 에러 발생 시 버튼 활성화
+            startReidBtn.innerText = "Start re-id"; // 에러 발생 시 버튼 텍스트 원래대로
         }
     });
 
@@ -291,9 +290,8 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             alert(`에러 발생: ${error.message}`);
             console.error('Error:', error);
-        } finally {
-            createDatasetBtn.disabled = false; // 버튼 활성화
-            createDatasetBtn.innerText = "생성"; // 버튼 텍스트 원래대로
+            createDatasetBtn.disabled = false; // 에러 발생 시 버튼 활성화
+            createDatasetBtn.innerText = "생성"; // 에러 발생 시 버튼 텍스트 원래대로
         }
     });
 
