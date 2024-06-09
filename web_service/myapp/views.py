@@ -146,12 +146,14 @@ def encode_image_to_base64(image_path):
 
 def get_imgs(request):
     image_paths = request.GET.getlist('resultImgPathList')
+    
     if not image_paths:
         return JsonResponse({'error': 'No image paths provided'}, status=400)
     
     image_paths = [unquote(path) for path in image_paths]  # URL 디코딩
+    print(f"img path: {image_paths[0]}")
     encoded_images = [encode_image_to_base64(image_path) for image_path in image_paths]
-    
+    print(f"encoded img: {encoded_images[0]}")
     if None in encoded_images:
         return JsonResponse({'error': 'One or more images could not be processed'}, status=500)
     

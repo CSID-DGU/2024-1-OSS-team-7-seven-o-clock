@@ -139,30 +139,50 @@ document.addEventListener('DOMContentLoaded', function () {
         progressBar.style.width = `${percentage}%`;
     }
 
-    function displayResults(results) {
+    async function displayResults(results) {
         resultReid.innerHTML = '';
 
-        const datasetName = datasetSelect.value;
-        const imagePaths = results.map(result => {
-            return `/root/amd/reid_model/datasets/${datasetName}/imgs/${result}`;
-        });
+        const imagePaths = results.map(result => `${result}`);
+        const chunkSize = 2;
 
-        fetchBase64Images(imagePaths).then(base64Images => {
-            base64Images.forEach(base64Image => {
-                const img = new Image();
-                img.onload = function () {
-                    resultReid.appendChild(img);
+        for (let i = 0; i < imagePaths.length; i += chunkSize) {
+            const chunk = imagePaths.slice(i, i + chunkSize);
+
+            try {
+                const base64Images = await fetchBase64Images(chunk);
+                console.log('Type of base64Images:', typeof base64Images);  // 기본 타입 확인
+                console.log('Is base64Images an array?', Array.isArray(base64Images));  // 배열인지 확인
+                console.log('base64Images:', base64Images);  // 실제 값 출력
+                if (base64Images.length === 0) {
+                    console.error('No images to display');
+                    resultReid.innerHTML = '<p>결과가 없습니다.</p>';
                     resultReid.classList.remove('hidden');
-                };
-                img.src = base64Image;
-                img.alt = 'Loaded Image';
-            });
-
-            if (base64Images.length === 0) {
-                resultReid.innerHTML = '<p>결과가 없습니다.</p>';
-                resultReid.classList.remove('hidden');
+                    return;
+                }
+                for(let i = 0; i < base64Images.length; i++){
+                    const img = new Image();
+                    img.onload = function () {
+                        resultReid.appendChild(img);
+                        resultReid.classList.remove('hidden');
+                    };
+                    img.src = `data:image/jpeg;base64,${base64Images[i]}`;
+                    img.alt = 'Loaded Image';
+                }
+                /*
+                base64Images.forEach(base64Image => {
+                    const img = new Image();
+                    img.onload = function () {
+                        resultReid.appendChild(img);
+                        resultReid.classList.remove('hidden');
+                    };
+                    img.src = base64Image;
+                    img.alt = 'Loaded Image';
+                });
+                */
+            } catch (error) {
+                console.error('Error:', error);
             }
-        }).catch(error => console.error('Error:', error));
+        }
     }
 
     async function fetchBase64Images(imagePaths) {
@@ -171,11 +191,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const response = await fetch(`/getImgs/?${params.toString()}`);
         const data = await response.json();
-
+        console.log("data.resultImgList: ", data.resultImgList)
         if (data.error) {
             throw new Error(data.error);
         } else {
-            return data.images;
+        
+            return data.resultImgList;
         }
     }
 
