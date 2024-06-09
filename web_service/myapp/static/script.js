@@ -142,35 +142,43 @@ document.addEventListener('DOMContentLoaded', function () {
     function displayResults(results) {
         resultReid.innerHTML = '';
 
-        // 선택된 데이터셋 이름을 가져옵니다.
         const datasetName = datasetSelect.value;
-
-        /getImgs
-        {
-            resultImgPathList: ['~~~', '~~~']
-        }
-
-        results.forEach(result => {
-            const img = new Image();
-            img.onload = function () {
-                resultReid.appendChild(img);
-                resultReid.classList.remove('hidden');
-            };
-            // 이미지 파일 이름을 추출합니다.
+        const imagePaths = results.map(result => {
             const imgName = result.split('/').pop(); // 파일 이름 추출
-
-            // 새로운 동적 경로를 구성합니다.
-            const imgPath = `/root/amd/reid_model/datasets/${datasetName}/imgs/${imgName}`;
-            img.src = imgPath;
-            img.alt = 'Loaded Image';
+            return `/root/amd/reid_model/datasets/${datasetName}/imgs/${imgName}`;
         });
 
-        if (results.length === 0) {
-            resultReid.innerHTML = '<p>결과가 없습니다.</p>';
-            resultReid.classList.remove('hidden');
-        }
+        fetchBase64Images(imagePaths).then(base64Images => {
+            base64Images.forEach(base64Image => {
+                const img = new Image();
+                img.onload = function () {
+                    resultReid.appendChild(img);
+                    resultReid.classList.remove('hidden');
+                };
+                img.src = base64Image;
+                img.alt = 'Loaded Image';
+            });
+
+            if (base64Images.length === 0) {
+                resultReid.innerHTML = '<p>결과가 없습니다.</p>';
+                resultReid.classList.remove('hidden');
+            }
+        }).catch(error => console.error('Error:', error));
     }
 
+    async function fetchBase64Images(imagePaths) {
+        const params = new URLSearchParams();
+        imagePaths.forEach(path => params.append('resultImgPathList', encodeURIComponent(path)));
+
+        const response = await fetch(`/getImgs/?${params.toString()}`);
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        } else {
+            return data.images;
+        }
+    }
     let taskStatusInterval;
 
     startReidBtn.addEventListener('click', async function () {
