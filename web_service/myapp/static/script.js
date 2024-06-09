@@ -144,8 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const datasetName = datasetSelect.value;
         const imagePaths = results.map(result => {
-            const imgName = result.split('/').pop(); // 파일 이름 추출
-            return `/root/amd/reid_model/datasets/${datasetName}/imgs/${imgName}`;
+            return `/root/amd/reid_model/datasets/${datasetName}/imgs/${result}`;
         });
 
         fetchBase64Images(imagePaths).then(base64Images => {
@@ -179,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return data.images;
         }
     }
+
     let taskStatusInterval;
 
     startReidBtn.addEventListener('click', async function () {
